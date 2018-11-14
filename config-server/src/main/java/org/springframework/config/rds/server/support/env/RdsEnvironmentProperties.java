@@ -11,7 +11,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.sql.DataSource;
 
-@ConfigurationProperties(prefix = "service.rds.config")
+@ConfigurationProperties(prefix = "spring.rds.config")
 public class RdsEnvironmentProperties implements EnvironmentRepositoryProperties, InitializingBean {
 
     private int order = Ordered.LOWEST_PRECEDENCE;
