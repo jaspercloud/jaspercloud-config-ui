@@ -40,18 +40,18 @@ public class ConfigStorageServiceImpl implements ConfigStorageService, Initializ
     }
 
     @Override
-    public void publishConfig(String application, String namespace, String type, String content) throws Exception {
+    public void publishConfig(String application, String group, String type, String content) throws Exception {
         new Properties().load(new StringReader(content));
-        if (StringUtils.isEmpty(namespace) || "DEFAULT_GROUP".equals(namespace)) {
-            namespace = "default";
+        if (StringUtils.isEmpty(group) || "DEFAULT_GROUP".equals(group)) {
+            group = "default";
         }
-        String finalNamespace = namespace;
+        String finalGroup = group;
         try {
             transactionTemplate.execute(new TransactionCallbackWithoutResult() {
                 @Override
                 protected void doInTransactionWithoutResult(TransactionStatus transactionStatus) {
-                    String sql = "insert into config_info (application,namespace,config) values (?,?,?)";
-                    jdbcTemplate.update(sql, new Object[]{application, finalNamespace, content});
+                    String sql = "insert into config_info (application,group_area,content) values (?,?,?)";
+                    jdbcTemplate.update(sql, new Object[]{application, finalGroup, content});
                 }
             });
         } catch (DuplicateKeyException e) {
@@ -60,16 +60,16 @@ public class ConfigStorageServiceImpl implements ConfigStorageService, Initializ
                 protected void doInTransactionWithoutResult(TransactionStatus transactionStatus) {
                     JdbcResult jdbcResult;
                     {
-                        String sql = "select config,ver from config_info where application=? and namespace=?";
-                        jdbcResult = jdbcTemplate.query(sql, new Object[]{application, finalNamespace}, new ResultSetExtractor<JdbcResult>() {
+                        String sql = "select content,ver from config_info where application=? and group_area=?";
+                        jdbcResult = jdbcTemplate.query(sql, new Object[]{application, finalGroup}, new ResultSetExtractor<JdbcResult>() {
                             @Override
                             public JdbcResult extractData(ResultSet resultSet) throws SQLException, DataAccessException {
                                 if (!resultSet.next()) {
                                     return null;
                                 }
                                 int version = resultSet.getInt("ver");
-                                String config = resultSet.getString("config");
-                                JdbcResult jdbcResult = new JdbcResult(version, config);
+                                String content = resultSet.getString("content");
+                                JdbcResult jdbcResult = new JdbcResult(version, content);
                                 return jdbcResult;
                             }
                         });
@@ -78,12 +78,12 @@ public class ConfigStorageServiceImpl implements ConfigStorageService, Initializ
                         }
                     }
                     {
-                        String sql = "update config_info set config=?,ver=ver+1 where application=? and namespace=?";
-                        jdbcTemplate.update(sql, new Object[]{content, application, finalNamespace});
+                        String sql = "update config_info set content=?,ver=ver+1 where application=? and group_area=?";
+                        jdbcTemplate.update(sql, new Object[]{content, application, finalGroup});
                     }
                     {
-                        String sql = "insert into config_history (application,namespace,config,ver) values (?,?,?,?)";
-                        jdbcTemplate.update(sql, new Object[]{application, finalNamespace, jdbcResult.getConfig(), jdbcResult.getVersion()});
+                        String sql = "insert into config_history (application,group_area,content,ver) values (?,?,?,?)";
+                        jdbcTemplate.update(sql, new Object[]{application, finalGroup, jdbcResult.getContent(), jdbcResult.getVersion()});
                     }
                 }
             });
@@ -101,9 +101,9 @@ public class ConfigStorageServiceImpl implements ConfigStorageService, Initializ
                     ConfigInfo info = new ConfigInfo();
                     info.setId(resultSet.getLong("id"));
                     info.setDataId(resultSet.getString("application"));
-                    info.setGroup(resultSet.getString("namespace"));
-                    info.setContent(resultSet.getString("config"));
-                    info.setMd5(MD5.getInstance().getMD5String(resultSet.getString("config")));
+                    info.setGroup(resultSet.getString("group_area"));
+                    info.setContent(resultSet.getString("content"));
+                    info.setMd5(MD5.getInstance().getMD5String(resultSet.getString("content")));
                     page.getPageItems().add(info);
                 }
                 return page;
@@ -113,9 +113,9 @@ public class ConfigStorageServiceImpl implements ConfigStorageService, Initializ
     }
 
     @Override
-    public ConfigAllInfo detailConfigInfo(String application, String namespace) {
-        String sql = "select * from config_info where application=? and namespace=?";
-        ConfigAllInfo info = jdbcTemplate.query(sql, new Object[]{application, namespace}, new ResultSetExtractor<ConfigAllInfo>() {
+    public ConfigAllInfo detailConfigInfo(String application, String group) {
+        String sql = "select * from config_info where application=? and group_area=?";
+        ConfigAllInfo info = jdbcTemplate.query(sql, new Object[]{application, group}, new ResultSetExtractor<ConfigAllInfo>() {
             @Override
             public ConfigAllInfo extractData(ResultSet resultSet) throws SQLException, DataAccessException {
                 if (!resultSet.next()) {
@@ -124,9 +124,9 @@ public class ConfigStorageServiceImpl implements ConfigStorageService, Initializ
                 ConfigAllInfo info = new ConfigAllInfo();
                 info.setId(resultSet.getLong("id"));
                 info.setDataId(resultSet.getString("application"));
-                info.setGroup(resultSet.getString("namespace"));
-                info.setContent(resultSet.getString("config"));
-                info.setMd5(MD5.getInstance().getMD5String(resultSet.getString("config")));
+                info.setGroup(resultSet.getString("group_area"));
+                info.setContent(resultSet.getString("content"));
+                info.setMd5(MD5.getInstance().getMD5String(resultSet.getString("content")));
                 info.setType("properties");
                 return info;
             }
@@ -135,23 +135,23 @@ public class ConfigStorageServiceImpl implements ConfigStorageService, Initializ
     }
 
     @Override
-    public void deleteConfig(String application, String namespace) {
+    public void deleteConfig(String application, String group) {
         transactionTemplate.execute(new TransactionCallbackWithoutResult() {
             @Override
             protected void doInTransactionWithoutResult(TransactionStatus transactionStatus) {
-                String sql = "delete from config_info where application=? and namespace=?";
-                jdbcTemplate.update(sql, new Object[]{application, namespace});
+                String sql = "delete from config_info where application=? and group_area=?";
+                jdbcTemplate.update(sql, new Object[]{application, group});
             }
         });
     }
 
     @Override
-    public Page<ConfigHistoryInfo> listConfigHistory(String application, String namespace) {
-        if (StringUtils.isEmpty(namespace) || "DEFAULT_GROUP".equals(namespace)) {
-            namespace = "default";
+    public Page<ConfigHistoryInfo> listConfigHistory(String application, String group) {
+        if (StringUtils.isEmpty(group) || "DEFAULT_GROUP".equals(group)) {
+            group = "default";
         }
-        String sql = "select * from config_history where application=? and namespace=? order by id desc";
-        Page<ConfigHistoryInfo> page = jdbcTemplate.query(sql, new Object[]{application, namespace}, new ResultSetExtractor<Page<ConfigHistoryInfo>>() {
+        String sql = "select * from config_history where application=? and group_area=? order by id desc";
+        Page<ConfigHistoryInfo> page = jdbcTemplate.query(sql, new Object[]{application, group}, new ResultSetExtractor<Page<ConfigHistoryInfo>>() {
             @Override
             public Page<ConfigHistoryInfo> extractData(ResultSet resultSet) throws SQLException, DataAccessException {
                 Page<ConfigHistoryInfo> page = new Page<>();
@@ -159,9 +159,9 @@ public class ConfigStorageServiceImpl implements ConfigStorageService, Initializ
                     ConfigHistoryInfo info = new ConfigHistoryInfo();
                     info.setId(resultSet.getLong("id"));
                     info.setDataId(resultSet.getString("application"));
-                    info.setGroup(resultSet.getString("namespace"));
-                    info.setContent(resultSet.getString("config"));
-                    info.setMd5(MD5.getInstance().getMD5String(resultSet.getString("config")));
+                    info.setGroup(resultSet.getString("group_area"));
+                    info.setContent(resultSet.getString("content"));
+                    info.setMd5(MD5.getInstance().getMD5String(resultSet.getString("content")));
                     info.setCreatedTime(resultSet.getTimestamp("create_time"));
                     info.setLastModifiedTime(resultSet.getTimestamp("create_time"));
                     page.getPageItems().add(info);
@@ -184,9 +184,9 @@ public class ConfigStorageServiceImpl implements ConfigStorageService, Initializ
                 ConfigHistoryInfo info = new ConfigHistoryInfo();
                 info.setId(resultSet.getLong("id"));
                 info.setDataId(resultSet.getString("application"));
-                info.setGroup(resultSet.getString("namespace"));
-                info.setContent(resultSet.getString("config"));
-                info.setMd5(MD5.getInstance().getMD5String(resultSet.getString("config")));
+                info.setGroup(resultSet.getString("group_area"));
+                info.setContent(resultSet.getString("content"));
+                info.setMd5(MD5.getInstance().getMD5String(resultSet.getString("content")));
                 info.setCreatedTime(resultSet.getTimestamp("create_time"));
                 info.setLastModifiedTime(resultSet.getTimestamp("create_time"));
                 info.setOpType("U");
@@ -197,31 +197,31 @@ public class ConfigStorageServiceImpl implements ConfigStorageService, Initializ
     }
 
     @Override
-    public int getVersion(String application, String namespace) {
-        if (StringUtils.isEmpty(namespace) || "DEFAULT_GROUP".equals(namespace)) {
-            namespace = "default";
+    public int getVersion(String application, String group) {
+        if (StringUtils.isEmpty(group) || "DEFAULT_GROUP".equals(group)) {
+            group = "default";
         }
-        String sql = "select ver from config_info where application=? and namespace=?";
-        Integer version = jdbcTemplate.queryForObject(sql, new Object[]{application, namespace}, Integer.class);
+        String sql = "select ver from config_info where application=? and group_area=?";
+        Integer version = jdbcTemplate.queryForObject(sql, new Object[]{application, group}, Integer.class);
         return version;
     }
 
     private static class JdbcResult {
 
         private int version;
-        private String config;
+        private String content;
 
         public int getVersion() {
             return version;
         }
 
-        public String getConfig() {
-            return config;
+        public String getContent() {
+            return content;
         }
 
-        public JdbcResult(int version, String config) {
+        public JdbcResult(int version, String content) {
             this.version = version;
-            this.config = config;
+            this.content = content;
         }
     }
 }

@@ -7,17 +7,17 @@ import org.springframework.config.rds.server.support.nacos.model.Page;
 
 public interface ConfigStorageService {
 
-    void publishConfig(String application, String namespace, String type, String content) throws Exception;
+    void publishConfig(String application, String group, String type, String content) throws Exception;
 
     Page<ConfigInfo> searchConfigList();
 
-    ConfigAllInfo detailConfigInfo(String application, String namespace);
+    ConfigAllInfo detailConfigInfo(String application, String group);
 
-    void deleteConfig(String application, String namespace);
+    void deleteConfig(String application, String group);
 
-    Page<ConfigHistoryInfo> listConfigHistory(String application, String namespace);
+    Page<ConfigHistoryInfo> listConfigHistory(String application, String group);
 
     ConfigHistoryInfo getConfigHistoryInfo(Long nid);
 
-    int getVersion(String application, String namespace);
+    int getVersion(String application, String group);
 }

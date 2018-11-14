@@ -16,8 +16,8 @@ public class SubConfigController {
 
     @GetMapping("/listen")
     public Integer listen(@RequestParam("application") String application,
-                          @RequestParam(value = "namespace", required = false) String namespace) {
-        int version = configStorageService.getVersion(application, namespace);
+                          @RequestParam(value = "group", required = false) String group) {
+        int version = configStorageService.getVersion(application, group);
         return version;
     }
 }

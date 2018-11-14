@@ -43,7 +43,7 @@ public class RemoteEnvironmentRefresher implements InitializingBean {
         String url = UriComponentsBuilder.fromHttpUrl(uri)
                 .path("/listen")
                 .queryParam("application", configProperties.getName())
-                .queryParam("namespace", configProperties.getLabel())
+                .queryParam("group", configProperties.getProfile())
                 .build().toString();
         Integer version = restTemplate.getForObject(url, Integer.class);
         Integer currentVersion = environment.getProperty("spring.config.version", Integer.class);

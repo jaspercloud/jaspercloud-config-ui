@@ -47,19 +47,19 @@ public class RdsEnvironmentRepository implements EnvironmentRepository, Initiali
         }
     }
 
-    private PropertySource find(String application, String namespace) throws Exception {
-        if (null == namespace) {
-            namespace = "default";
+    private PropertySource find(String application, String group) throws Exception {
+        if (null == group) {
+            group = "default";
         }
-        String sql = "select config,ver from config_info where application=? and namespace=?";
-        JdbcResult jdbcResult = jdbc.query(sql, new Object[]{application, namespace}, new ResultSetExtractor<JdbcResult>() {
+        String sql = "select content,ver from config_info where application=? and group_area=?";
+        JdbcResult jdbcResult = jdbc.query(sql, new Object[]{application, group}, new ResultSetExtractor<JdbcResult>() {
             @Override
             public JdbcResult extractData(ResultSet resultSet) throws SQLException, DataAccessException {
                 if (!resultSet.next()) {
                     return null;
                 }
                 int version = resultSet.getInt("ver");
-                String config = resultSet.getString("config");
+                String config = resultSet.getString("content");
                 JdbcResult jdbcResult = new JdbcResult(version, config);
                 return jdbcResult;
             }
@@ -68,7 +68,7 @@ public class RdsEnvironmentRepository implements EnvironmentRepository, Initiali
             return null;
         }
         Properties properties = new Properties();
-        properties.load(new StringReader(jdbcResult.getConfig()));
+        properties.load(new StringReader(jdbcResult.getContent()));
         properties.put("spring.config.version", jdbcResult.getVersion());
         PropertySource source = new PropertySource(application, properties);
         return source;
@@ -77,19 +77,19 @@ public class RdsEnvironmentRepository implements EnvironmentRepository, Initiali
     private static class JdbcResult {
 
         private int version;
-        private String config;
+        private String content;
 
         public int getVersion() {
             return version;
         }
 
-        public String getConfig() {
-            return config;
+        public String getContent() {
+            return content;
         }
 
-        public JdbcResult(int version, String config) {
+        public JdbcResult(int version, String content) {
             this.version = version;
-            this.config = config;
+            this.content = content;
         }
     }
 }
