@@ -12,20 +12,31 @@ import io.netty.resolver.dns.DefaultDnsCache;
 import io.netty.resolver.dns.DnsNameResolver;
 import io.netty.resolver.dns.DnsNameResolverBuilder;
 import io.netty.resolver.dns.SequentialDnsServerAddressStreamProvider;
-import io.netty.util.internal.SocketUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.config.rds.server.entity.DomainConfig;
+import org.springframework.config.rds.server.service.DomainConfigService;
 import org.springframework.stereotype.Component;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Component
 @ChannelHandler.Sharable
 public class DnsChannelInboundHandlerAdapter extends ChannelInboundHandlerAdapter implements InitializingBean {
+
+    private Logger logger = LoggerFactory.getLogger(getClass());
+
+    @Autowired
+    private DomainConfigService domainConfigService;
 
     @Value("${dns.servers}")
     private String[] dnsServers;
@@ -36,22 +47,10 @@ public class DnsChannelInboundHandlerAdapter extends ChannelInboundHandlerAdapte
     @Value("${dns.cache.timeout.seconds}")
     private int cacheSeconds;
 
-    @Value("${dns.ttl.timeout.seconds}")
-    private long ttlTimeout;
-
-    @Value("${dns.domains}")
-    private String[] dnsDomains;
-
     private DnsNameResolver nameResolver;
-
-    private Map<String, String> domainMap = new HashMap<>();
 
     @Override
     public void afterPropertiesSet() throws Exception {
-        for (String config : dnsDomains) {
-            String[] splits = config.split("=");
-            domainMap.put(splits[0], splits[1]);
-        }
         List<InetSocketAddress> addressList = Arrays.stream(dnsServers).map(new Function<String, InetSocketAddress>() {
             @Override
             public InetSocketAddress apply(String dns) {
@@ -78,21 +77,29 @@ public class DnsChannelInboundHandlerAdapter extends ChannelInboundHandlerAdapte
         DnsRecordType dnsRecordType = dnsQuestion.type();
         if (DnsRecordType.A.equals(dnsRecordType)) {
             String domain = getDomain(dnsQuestion.name());
-            String ip = domainMap.get(domain);
-            List<InetAddress> inetAddressList = new ArrayList<>();
-            if (null == ip) {
-                List<InetAddress> list = nameResolver.resolveAll(domain).get();
-                inetAddressList.addAll(list);
+            DomainConfig config = domainConfigService.getDomainConfigCache(domain);
+            if (null == config) {
+                List<DnsRecord> recordList = nameResolver.resolveAll(dnsQuestion).get();
+                for (DnsRecord record : recordList) {
+                    response.addRecord(DnsSection.ANSWER, record);
+                }
             } else {
-                InetAddress inetAddress = InetAddress.getByName(ip);
-                inetAddressList.add(inetAddress);
+                List<String> ips = config.getIps();
+                if (null == ips) {
+                    ips = new ArrayList<>();
+                }
+                for (String ip : ips) {
+                    InetAddress inetAddress = InetAddress.getByName(ip);
+                    byte[] bytes = inetAddress.getAddress();
+                    DefaultDnsRawRecord queryAnswer = new DefaultDnsRawRecord(dnsQuestion.name(),
+                            DnsRecordType.A, config.getTtl(), Unpooled.wrappedBuffer(bytes));
+                    response.addRecord(DnsSection.ANSWER, queryAnswer);
+                }
             }
-            for (InetAddress inetAddress : inetAddressList) {
-                byte[] address = SocketUtils.addressByName(inetAddress.getHostAddress()).getAddress();
-                DefaultDnsRawRecord queryAnswer = new DefaultDnsRawRecord(dnsQuestion.name(),
-                        DnsRecordType.A, ttlTimeout, Unpooled.wrappedBuffer(address));
-                response.addRecord(DnsSection.ANSWER, queryAnswer);
-            }
+        } else if (DnsRecordType.PTR.equals(dnsRecordType)) {
+            logger.debug(dnsRecordType.toString());
+        } else {
+            logger.error(dnsRecordType.toString());
         }
         ctx.writeAndFlush(response);
     }
