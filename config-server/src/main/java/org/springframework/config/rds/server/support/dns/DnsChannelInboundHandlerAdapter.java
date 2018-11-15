@@ -11,7 +11,6 @@ import io.netty.resolver.ResolvedAddressTypes;
 import io.netty.resolver.dns.DefaultDnsCache;
 import io.netty.resolver.dns.DnsNameResolver;
 import io.netty.resolver.dns.DnsNameResolverBuilder;
-import io.netty.resolver.dns.SequentialDnsServerAddressStreamProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
@@ -22,12 +21,8 @@ import org.springframework.config.rds.server.service.DomainConfigService;
 import org.springframework.stereotype.Component;
 
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Component
 @ChannelHandler.Sharable
@@ -37,9 +32,6 @@ public class DnsChannelInboundHandlerAdapter extends ChannelInboundHandlerAdapte
 
     @Autowired
     private DomainConfigService domainConfigService;
-
-    @Value("${dns.servers}")
-    private String[] dnsServers;
 
     @Value("${dns.query.timeout.millis}")
     private long queryTimeout;
@@ -51,19 +43,11 @@ public class DnsChannelInboundHandlerAdapter extends ChannelInboundHandlerAdapte
 
     @Override
     public void afterPropertiesSet() throws Exception {
-        List<InetSocketAddress> addressList = Arrays.stream(dnsServers).map(new Function<String, InetSocketAddress>() {
-            @Override
-            public InetSocketAddress apply(String dns) {
-                InetSocketAddress inetSocketAddress = new InetSocketAddress(dns, 53);
-                return inetSocketAddress;
-            }
-        }).collect(Collectors.toList());
         NioEventLoopGroup eventExecutors = new NioEventLoopGroup();
         nameResolver = new DnsNameResolverBuilder(eventExecutors.next())
                 .channelType(NioDatagramChannel.class)
                 .resolvedAddressTypes(ResolvedAddressTypes.IPV4_ONLY)
                 .resolveCache(new DefaultDnsCache(0, cacheSeconds, 0))
-                .nameServerProvider(new SequentialDnsServerAddressStreamProvider(addressList.toArray(new InetSocketAddress[0])))
                 .queryTimeoutMillis(queryTimeout)
                 .build();
     }
@@ -75,13 +59,17 @@ public class DnsChannelInboundHandlerAdapter extends ChannelInboundHandlerAdapte
         DefaultDnsQuestion dnsQuestion = query.recordAt(DnsSection.QUESTION);
         response.addRecord(DnsSection.QUESTION, dnsQuestion);
         DnsRecordType dnsRecordType = dnsQuestion.type();
-        if (DnsRecordType.A.equals(dnsRecordType)) {
+        if (DnsRecordType.A.equals(dnsRecordType) || DnsRecordType.ANY.equals(dnsRecordType)) {
             String domain = getDomain(dnsQuestion.name());
             DomainConfig config = domainConfigService.getDomainConfigCache(domain);
             if (null == config) {
-                List<DnsRecord> recordList = nameResolver.resolveAll(dnsQuestion).get();
+                DnsQuestion queryQuestion = new DefaultDnsQuestion(dnsQuestion.name(), DnsRecordType.A);
+                List<DnsRecord> recordList = nameResolver.resolveAll(queryQuestion).get();
                 for (DnsRecord record : recordList) {
-                    response.addRecord(DnsSection.ANSWER, record);
+                    DnsRawRecord dnsRawRecord = (DnsRawRecord) record;
+                    DnsRecord dnsRecord = new DefaultDnsRawRecord(dnsRawRecord.name(),
+                            DnsRecordType.A, dnsRawRecord.timeToLive(), dnsRawRecord.content());
+                    response.addRecord(DnsSection.ANSWER, dnsRecord);
                 }
             } else {
                 List<String> ips = config.getIps();
