@@ -11,6 +11,7 @@ import io.netty.resolver.ResolvedAddressTypes;
 import io.netty.resolver.dns.DefaultDnsCache;
 import io.netty.resolver.dns.DnsNameResolver;
 import io.netty.resolver.dns.DnsNameResolverBuilder;
+import org.apache.commons.lang3.RandomUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
@@ -21,7 +22,6 @@ import org.springframework.config.rds.server.service.DomainConfigService;
 import org.springframework.stereotype.Component;
 
 import java.net.InetAddress;
-import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -73,10 +73,10 @@ public class DnsChannelInboundHandlerAdapter extends ChannelInboundHandlerAdapte
                 }
             } else {
                 List<String> ips = config.getIps();
-                if (null == ips) {
-                    ips = new ArrayList<>();
-                }
-                for (String ip : ips) {
+                if (null != ips && !ips.isEmpty()) {
+                    //负载均衡
+                    int rand = RandomUtils.nextInt(0, ips.size());
+                    String ip = ips.get(rand);
                     InetAddress inetAddress = InetAddress.getByName(ip);
                     byte[] bytes = inetAddress.getAddress();
                     DefaultDnsRawRecord queryAnswer = new DefaultDnsRawRecord(dnsQuestion.name(),
