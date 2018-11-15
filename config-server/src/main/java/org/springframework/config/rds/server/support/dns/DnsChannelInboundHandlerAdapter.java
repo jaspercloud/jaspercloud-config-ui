@@ -30,6 +30,15 @@ public class DnsChannelInboundHandlerAdapter extends ChannelInboundHandlerAdapte
     @Value("${dns.servers}")
     private String[] dnsServers;
 
+    @Value("${dns.query.timeout.millis}")
+    private long queryTimeout;
+
+    @Value("${dns.cache.timeout.seconds}")
+    private int cacheSeconds;
+
+    @Value("${dns.ttl.timeout.seconds}")
+    private long ttlTimeout;
+
     @Value("${dns.domains}")
     private String[] dnsDomains;
 
@@ -54,9 +63,9 @@ public class DnsChannelInboundHandlerAdapter extends ChannelInboundHandlerAdapte
         nameResolver = new DnsNameResolverBuilder(eventExecutors.next())
                 .channelType(NioDatagramChannel.class)
                 .resolvedAddressTypes(ResolvedAddressTypes.IPV4_ONLY)
-                .resolveCache(new DefaultDnsCache(0, 300, 0))
+                .resolveCache(new DefaultDnsCache(0, cacheSeconds, 0))
                 .nameServerProvider(new SequentialDnsServerAddressStreamProvider(addressList.toArray(new InetSocketAddress[0])))
-                .queryTimeoutMillis(5 * 1000)
+                .queryTimeoutMillis(queryTimeout)
                 .build();
     }
 
@@ -81,7 +90,7 @@ public class DnsChannelInboundHandlerAdapter extends ChannelInboundHandlerAdapte
             for (InetAddress inetAddress : inetAddressList) {
                 byte[] address = SocketUtils.addressByName(inetAddress.getHostAddress()).getAddress();
                 DefaultDnsRawRecord queryAnswer = new DefaultDnsRawRecord(dnsQuestion.name(),
-                        DnsRecordType.A, 5, Unpooled.wrappedBuffer(address));
+                        DnsRecordType.A, ttlTimeout, Unpooled.wrappedBuffer(address));
                 response.addRecord(DnsSection.ANSWER, queryAnswer);
             }
         }
