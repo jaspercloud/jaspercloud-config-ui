@@ -10,6 +10,6 @@ public class RabbitConfig {
 
     @Bean
     public Exchange eventBusExchange() {
-        return new FanoutExchange("eventBusExchange", true, false);
+        return new FanoutExchange("eventBusExchange", false, false);
     }
 }
