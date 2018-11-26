@@ -17,7 +17,7 @@ public class JasperCloudClientConfig {
 
     @Bean
     public Queue eventBusQueue() {
-        return new Queue("eventBus", true, true, true);
+        return new Queue("eventBus", false, true, true);
     }
 
     @Bean
