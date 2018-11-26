@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageListener;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.config.client.ConfigClientProperties;
 import org.springframework.cloud.context.refresh.ContextRefresher;
@@ -21,7 +20,6 @@ public class RabbitRemoteEnvironmentRefresher implements MessageListener {
 
     private Gson gson = new Gson();
 
-    @RabbitListener(queues = "eventBus")
     @Override
     public void onMessage(Message message) {
         byte[] bytes = message.getBody();
