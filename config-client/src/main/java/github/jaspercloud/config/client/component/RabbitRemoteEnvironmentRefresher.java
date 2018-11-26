@@ -8,8 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.config.client.ConfigClientProperties;
 import org.springframework.cloud.context.refresh.ContextRefresher;
 
-import java.util.Optional;
-
 public class RabbitRemoteEnvironmentRefresher implements MessageListener {
 
     @Autowired
@@ -28,7 +26,8 @@ public class RabbitRemoteEnvironmentRefresher implements MessageListener {
         }
         String json = new String(bytes);
         JsonObject jsonObject = gson.fromJson(json, JsonObject.class);
-        if (!configProperties.getName().equals(Optional.ofNullable(jsonObject.get("configName")).get().getAsString())) {
+        String configName = jsonObject.get("configName").getAsString();
+        if (!configProperties.getName().equals(configName)) {
             return;
         }
         contextRefresher.refresh();
