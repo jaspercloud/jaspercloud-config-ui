@@ -12,7 +12,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.Random;
 
-public class RemoteEnvironmentRefresher implements InitializingBean {
+@Deprecated
+public class RestRemoteEnvironmentRefresher implements InitializingBean {
 
     @Autowired
     private ContextRefresher contextRefresher;

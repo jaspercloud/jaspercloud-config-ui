@@ -1,5 +1,8 @@
 package org.springframework.config.rds.server.support.nacos.controller;
 
+import com.google.gson.JsonObject;
+import org.springframework.amqp.core.Exchange;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.config.rds.server.service.ConfigStorageService;
 import org.springframework.config.rds.server.support.nacos.model.ConfigAllInfo;
@@ -14,6 +17,12 @@ public class NacosConfigController {
     @Autowired
     private ConfigStorageService configStorageService;
 
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
+
+    @Autowired
+    private Exchange eventBusExchange;
+
     @PostMapping
     public Boolean publishConfig(
             @RequestParam("dataId") String dataId,
@@ -21,7 +30,15 @@ public class NacosConfigController {
             @RequestParam(value = "type", required = false) String type,
             @RequestParam("content") String content) throws Exception {
         configStorageService.publishConfig(dataId, group, type, content);
+        sendEventBus(dataId);
         return true;
+    }
+
+    private void sendEventBus(String configName) {
+        JsonObject jsonObject = new JsonObject();
+        jsonObject.addProperty("configName", configName);
+        String json = jsonObject.toString();
+        rabbitTemplate.convertAndSend(eventBusExchange.getName(), null, json);
     }
 
     @GetMapping(params = "search=accurate")
